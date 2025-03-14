@@ -1747,10 +1747,30 @@ class SumkDFT(object):
                     mpi.report(f"Detected {use_dc_formula=}, changing to sAMF")
                     use_dc_formula = "sAMF"
                 
-                for sp in spn:
-                    DC_val, E_val = compute_DC_from_density(N_tot=Ncrtot,U=U_interact, J=J_hund, n_orbitals=dim, N_spin=Ncr[sp], method=use_dc_formula)
-                    self.dc_imp[icrsh][sp] *= DC_val
-                    self.dc_energ[icrsh] = E_val
+                if use_dc_formula in ['orb_resolved_diagonal_cFLL']:
+                    mpi.report(f"Using {use_dc_formula=}, make sure that the block structure contains all orbitals")
+                    for sp in spn:
+                        block_1 = list(self.gf_struct_solver[ish].keys())[0]
+                        block_2 = list(self.gf_struct_solver[ish].keys())[1]
+                        n_matrix = dens_mat[block_1].real + dens_mat[block_2].real
+                        # delete off diagonal elements
+                        n_matrix = np.diag(np.diag(n_matrix))   
+
+
+                        DC_val = U_interact * (n_matrix-0.5*np.eye(n_matrix.shape[0]))
+                        E_val = 0.0
+                        mpi.report(f"DC for shell {icrsh} =\n{DC_val}")
+                        for n_orb in np.diag(n_matrix):
+                            E_val += 0.5 * U_interact * n_orb * (n_orb - 1)
+
+                        self.dc_imp[icrsh][sp] = DC_val
+                        self.dc_energ[icrsh] = E_val
+                
+                else:
+                    for sp in spn:
+                        DC_val, E_val = compute_DC_from_density(N_tot=Ncrtot,U=U_interact, J=J_hund, n_orbitals=dim, N_spin=Ncr[sp], method=use_dc_formula)
+                        self.dc_imp[icrsh][sp] *= DC_val
+                        self.dc_energ[icrsh] = E_val
 
 
 
